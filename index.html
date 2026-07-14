@@ -42,6 +42,10 @@
     cols="80">
   </textarea>
 
+  <p id="saveStatus">
+  未保存
+  </p>
+
   <br><br>
 
   <button onclick="saveNote()">
@@ -137,26 +141,44 @@ window.logout = async function(){
 }
 
 //保存按钮
-window.saveNote = async function() {
+window.saveNote = async function () {
   const content =
     document.getElementById("note").value;
   const { error } =
     await supabase
       .from('notes')
       .update({
-        content: content
+        content: content,
+        updated_at: new Date()
       })
       .eq('id', 2);
   if(error){
     console.log(error);
-    alert("保存失败");
   }else{
-    alert("保存成功");
+    document.getElementById("saveStatus")
+      .innerText =
+      "已自动保存：" +
+      new Date().toLocaleTimeString();
   }
 }
-
 checkSession()
 
+let saveTimer;
+
+document
+  .getElementById("note")
+  .addEventListener("input", () => {
+
+    clearTimeout(saveTimer);
+
+    saveTimer = setTimeout(() => {
+
+      saveNote();
+
+    }, 3000);
+
+});
+  
 </script>
 
 </body>

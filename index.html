@@ -34,8 +34,19 @@
 
 <div id="content" style="display:none">
   <h1>欢迎来到 Inna Notes</h1>
+  <h2>工作区</h2>
 
-  <p>登录成功。</p>
+  <textarea
+    id="note"
+    rows="20"
+    cols="80">
+  </textarea>
+
+  <br><br>
+
+  <button onclick="saveNote()">
+  保存
+  </button>
 
   <button onclick="logout()">
     退出登录

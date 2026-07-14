@@ -1,46 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>Inna Notes</title>
+  <meta charset="UTF-8">
+  <title>Inna Notes</title>
 </head>
-
 <body>
 
 <div id="login">
-    <h2>请输入密码</h2>
+  <h2>登录 Inna Notes</h2>
 
-    <input type="password" id="password">
+  <input
+    id="email"
+    type="email"
+    placeholder="邮箱"
+  >
 
-    <button onclick="checkPassword()">
-        进入
-    </button>
+  <br><br>
+
+  <input
+    id="password"
+    type="password"
+    placeholder="密码"
+  >
+
+  <br><br>
+
+  <button onclick="login()">
+    登录
+  </button>
+
+  <p id="message"></p>
 </div>
 
 <div id="content" style="display:none">
-    <h1>欢迎来到 Inna Notes</h1>
-    <p>网站已成功锁定。</p>
+  <h1>欢迎来到 Inna Notes</h1>
+
+  <p>登录成功。</p>
+
+  <button onclick="logout()">
+    退出登录
+  </button>
 </div>
 
-<script>
+<script type="module">
 
-function checkPassword(){
+import { createClient }
+from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-    const password =
-        document.getElementById("password").value;
+const supabaseUrl =
+'https://uvvgafdlkrwluuseqvef.supabase.co'
 
-    if(password==="7654723"){
+const supabaseKey =
+'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2dmdhZmRsa3J3bHV1c2VxdmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Njk4ODEsImV4cCI6MjA5OTE0NTg4MX0.Q21EsLeel2nIsrxUQpe9_ZDwkvhXId9_FDTAQzXjGkE'
 
-        document.getElementById("login").style.display="none";
+const supabase =
+createClient(
+  supabaseUrl,
+  supabaseKey
+)
 
-        document.getElementById("content").style.display="block";
+async function checkSession() {
 
-    }else{
+  const {
+    data
+  } =
+  await supabase.auth.getSession()
 
-        alert("密码错误");
+  if(data.session){
 
-    }
+    document.getElementById("login")
+      .style.display = "none"
+
+    document.getElementById("content")
+      .style.display = "block"
+
+  }
 }
+
+window.login = async function(){
+
+  const email =
+    document.getElementById("email").value
+
+  const password =
+    document.getElementById("password").value
+
+  const { error } =
+    await supabase.auth.signInWithPassword({
+
+      email,
+      password
+
+    })
+
+  if(error){
+
+    document.getElementById("message")
+      .innerText = error.message
+
+  }else{
+
+    location.reload()
+
+  }
+
+}
+
+window.logout = async function(){
+
+  await supabase.auth.signOut()
+
+  location.reload()
+
+}
+
+checkSession()
 
 </script>
 

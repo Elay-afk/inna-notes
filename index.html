@@ -136,6 +136,25 @@ window.logout = async function(){
 
 }
 
+//保存按钮
+window.saveNote = async function() {
+  const content =
+    document.getElementById("note").value;
+  const { error } =
+    await supabase
+      .from('notes')
+      .update({
+        content: content
+      })
+      .eq('id', 2);
+  if(error){
+    console.log(error);
+    alert("保存失败");
+  }else{
+    alert("保存成功");
+  }
+}
+
 checkSession()
 
 </script>

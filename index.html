@@ -75,7 +75,8 @@ async function loadNote() {
   const { data, error } = await supabase
     .from('notes')
     .select('*')
-    .eq('title', 'Work');
+    .eq('id', '2')
+    .single();
   if (error) {
     console.log(error);
   } else {

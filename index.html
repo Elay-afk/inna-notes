@@ -1,28 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #16302b;
+      --ink-soft: #3d5a52;
+      --paper: #f3f0e8;
+      --paper-deep: #e7e1d4;
+      --leaf: #2f6f5e;
+      --leaf-deep: #1f4f43;
+      --mist: rgba(255, 255, 255, 0.55);
+      --line: rgba(22, 48, 43, 0.12);
+      --danger: #9b3b2e;
+      --shadow: 0 18px 40px rgba(22, 48, 43, 0.08);
+      --radius: 16px;
+      --font-display: "Fraunces", Georgia, serif;
+      --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      min-height: 100%;
+    }
+
+    body {
+      font-family: var(--font-body);
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%, rgba(47, 111, 94, 0.18), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 90% 100%, rgba(163, 120, 72, 0.14), transparent 50%),
+        linear-gradient(160deg, #eef3ef 0%, var(--paper) 45%, #ebe4d7 100%);
+      background-attachment: fixed;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.35;
+      background-image:
+        linear-gradient(rgba(22, 48, 43, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(22, 48, 43, 0.03) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .screen {
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---------- Login ---------- */
+    #login {
+      display: grid;
+      place-items: center;
+      padding: 32px 20px;
+      animation: rise-in 0.55s ease both;
+    }
+
+    .login-panel {
+      width: min(420px, 100%);
+      padding: 40px 36px 34px;
+      background: var(--mist);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      font-family: var(--font-display);
+      font-size: clamp(2.4rem, 6vw, 3.2rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    .login-panel p.lead {
+      color: var(--ink-soft);
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+
+    .field input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.78);
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .field input:focus {
+      border-color: var(--leaf);
+      box-shadow: 0 0 0 3px rgba(47, 111, 94, 0.15);
+    }
+
+    .btn-primary {
+      width: 100%;
+      margin-top: 8px;
+      padding: 13px 18px;
+      border-radius: 12px;
+      background: var(--leaf);
+      color: #f7faf8;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: var(--leaf-deep);
+    }
+
+    #message {
+      min-height: 1.4em;
+      margin-top: 14px;
+      color: var(--danger);
+      font-size: 0.92rem;
+    }
+
+    /* ---------- App shell ---------- */
+    #app {
+      display: none;
+      height: 100vh;
+      padding: 18px;
+      gap: 16px;
+      animation: rise-in 0.45s ease both;
+    }
+
+    #app.is-open {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+    }
+
+    .sidebar,
+    .editor {
+      background: rgba(255, 255, 255, 0.62);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .sidebar-top {
+      padding: 22px 18px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sidebar-top .brand {
+      font-size: 1.85rem;
+      margin-bottom: 14px;
+    }
+
+    .sidebar-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-new {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--leaf);
+      color: #f7faf8;
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+
+    .btn-new:hover {
+      background: var(--leaf-deep);
+    }
+
+    .btn-ghost {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-weight: 500;
+      font-size: 0.92rem;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(22, 48, 43, 0.05);
+    }
+
+    .note-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      list-style: none;
+    }
+
+    .note-row {
+      display: grid;
+      grid-template-columns: 22px 1fr 34px;
+      align-items: stretch;
+      gap: 2px;
+      margin-bottom: 6px;
+      border-radius: 12px;
+      animation: fade-slide 0.28s ease both;
+      transition: background 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .note-row:hover {
+      background: rgba(47, 111, 94, 0.06);
+    }
+
+    .note-row.active {
+      background: rgba(47, 111, 94, 0.14);
+    }
+
+    .note-row.dragging {
+      opacity: 0.45;
+    }
+
+    .note-row.drag-over {
+      box-shadow: inset 0 2px 0 var(--leaf);
+    }
+
+    .note-row.pinned .note-item .title::before {
+      content: "置顶 · ";
+      color: var(--leaf-deep);
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+    }
+
+    .drag-handle {
+      display: grid;
+      place-items: center;
+      color: rgba(22, 48, 43, 0.35);
+      cursor: grab;
+      user-select: none;
+      font-size: 0.95rem;
+      letter-spacing: -0.08em;
+      border-radius: 10px 0 0 10px;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .note-item {
+      width: 100%;
+      text-align: left;
+      padding: 11px 8px 10px 4px;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .note-item .title {
+      font-weight: 600;
+      font-size: 0.98rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .note-item .meta {
+      font-size: 0.8rem;
+      color: var(--ink-soft);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pin-btn {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      border-radius: 0 10px 10px 0;
+      background: transparent;
+      color: rgba(22, 48, 43, 0.35);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .pin-btn:hover {
+      color: var(--leaf-deep);
+      background: rgba(47, 111, 94, 0.1);
+    }
+
+    .pin-btn.is-pinned {
+      color: var(--leaf-deep);
+    }
+
+    .empty-list {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--ink-soft);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .editor {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #saveStatus {
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      transition: color 0.2s ease, opacity 0.2s ease;
+    }
+
+    #saveStatus.is-saved {
+      color: var(--leaf-deep);
+    }
+
+    .toolbar-right {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-save {
+      padding: 9px 14px;
+      border-radius: 10px;
+      background: var(--leaf);
+      color: #f7faf8;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .btn-save:hover {
+      background: var(--leaf-deep);
+    }
+
+    .btn-danger {
+      padding: 9px 14px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid rgba(155, 59, 46, 0.28);
+      color: var(--danger);
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    .btn-danger:hover {
+      background: rgba(155, 59, 46, 0.08);
+    }
+
+    .editor-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 18px 20px 20px;
+    }
+
+    #noteTitle {
+      width: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      padding: 4px 2px;
+    }
+
+    #noteTitle::placeholder {
+      color: rgba(22, 48, 43, 0.28);
+    }
+
+    #note {
+      flex: 1;
+      width: 100%;
+      min-height: 240px;
+      border: none;
+      outline: none;
+      resize: none;
+      background: transparent;
+      line-height: 1.7;
+      font-size: 1.05rem;
+      padding: 4px 2px;
+    }
+
+    #note::placeholder {
+      color: rgba(22, 48, 43, 0.3);
+    }
+
+    .editor-empty {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--ink-soft);
+      padding: 40px 24px;
+      line-height: 1.6;
+    }
+
+    .editor-empty strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @keyframes rise-in {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fade-slide {
+      from {
+        opacity: 0;
+        transform: translateX(-6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @media (max-width: 860px) {
+      #app.is-open {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(180px, 32vh) 1fr;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .sidebar,
+      .editor {
+        min-height: 0;
+      }
+
+      .editor {
+        min-height: 60vh;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="login" class="screen">
+    <div class="login-panel">
+      <div class="brand">Notes</div>
+      <p class="lead">你的私人记事本。登录后可创建多个编辑框，内容自动保存到云端。</p>
+
+      <div class="field">
+        <label for="email">邮箱</label>
+        <input id="email" type="email" placeholder="you@example.com" autocomplete="username">
+      </div>
+
+      <div class="field">
+        <label for="password">密码</label>
+        <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn-primary" type="button" onclick="login()">登录</button>
+      <p id="message"></p>
+    </div>
+  </div>
+
+  <div id="app" class="screen">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">Notes</div>
+        <div class="sidebar-actions">
+          <button class="btn-new" type="button" onclick="createNote()">新建笔记</button>
+          <button class="btn-ghost" type="button" onclick="logout()">退出</button>
+        </div>
+      </div>
+      <ul id="noteList" class="note-list"></ul>
+    </aside>
+
+    <main class="editor">
+      <div id="editorEmpty" class="editor-empty">
+        <div>
+          <strong>还没有笔记</strong>
+          点击左侧「新建笔记」，开始写下第一段文字。
+        </div>
+      </div>
+
+      <div id="editorPanel" class="hidden" style="display: contents;">
+        <div class="editor-toolbar">
+          <p id="saveStatus">未保存</p>
+          <div class="toolbar-right">
+            <button class="btn-ghost" id="pinToggleBtn" type="button" onclick="togglePin()">置顶</button>
+            <button class="btn-save" type="button" onclick="saveNote()">保存</button>
+            <button class="btn-danger" type="button" onclick="deleteNote()">删除</button>
+          </div>
+        </div>
+        <div class="editor-body">
+          <input id="noteTitle" type="text" placeholder="无标题" maxlength="120">
+          <textarea id="note" placeholder="开始书写…"></textarea>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const supabaseUrl = 'https://uvvgafdlkrwluuseqvef.supabase.co'
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2dmdhZmRsa3J3bHV1c2VxdmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Njk4ODEsImV4cCI6MjA5OTE0NTg4MX0.Q21EsLeel2nIsrxUQpe9_ZDwkvhXId9_FDTAQzXjGkE'
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    let currentUser = null
+    let notes = []
+    let activeNoteId = null
+    let saveTimer = null
+    let isSaving = false
+    let dirty = false
+    let dragNoteId = null
+
+    const loginEl = document.getElementById('login')
+    const appEl = document.getElementById('app')
+    const noteListEl = document.getElementById('noteList')
+    const noteTitleEl = document.getElementById('noteTitle')
+    const noteEl = document.getElementById('note')
+    const saveStatusEl = document.getElementById('saveStatus')
+    const editorEmptyEl = document.getElementById('editorEmpty')
+    const editorPanelEl = document.getElementById('editorPanel')
+    const messageEl = document.getElementById('message')
+    const pinToggleBtn = document.getElementById('pinToggleBtn')
+
+    function setSaveStatus(text, saved = false) {
+      saveStatusEl.innerText = text
+      saveStatusEl.classList.toggle('is-saved', saved)
+    }
+
+    function formatTime(value) {
+      if (!value) return ''
+      return new Date(value).toLocaleString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    function previewText(content) {
+      const text = (content || '').replace(/\s+/g, ' ').trim()
+      if (!text) return '空笔记'
+      return text.length > 36 ? text.slice(0, 36) + '…' : text
+    }
+
+    function showApp() {
+      loginEl.style.display = 'none'
+      appEl.style.display = ''
+      appEl.classList.add('is-open')
+    }
+
+    function showLogin() {
+      appEl.classList.remove('is-open')
+      appEl.style.display = 'none'
+      loginEl.style.display = 'grid'
+    }
+
+    function showEditor(hasNote) {
+      editorEmptyEl.classList.toggle('hidden', hasNote)
+      editorPanelEl.classList.toggle('hidden', !hasNote)
+      if (hasNote) {
+        editorPanelEl.style.display = 'contents'
+      }
+    }
+
+    function getActiveNote() {
+      return notes.find((n) => n.id === activeNoteId) || null
+    }
+
+    function sortNotesInPlace() {
+      notes.sort((a, b) => {
+        const pinDiff = Number(!!b.is_pinned) - Number(!!a.is_pinned)
+        if (pinDiff !== 0) return pinDiff
+        const orderA = a.sort_order ?? 0
+        const orderB = b.sort_order ?? 0
+        if (orderA !== orderB) return orderA - orderB
+        return new Date(b.updated_at) - new Date(a.updated_at)
+      })
+    }
+
+    function nextSortOrder(pinned) {
+      const group = notes.filter((n) => !!n.is_pinned === !!pinned)
+      if (!group.length) return 0
+      return Math.min(...group.map((n) => n.sort_order ?? 0)) - 1
+    }
+
+    function updatePinButton() {
+      const note = getActiveNote()
+      if (!note) return
+      const pinned = !!note.is_pinned
+      pinToggleBtn.textContent = pinned ? '取消置顶' : '置顶'
+      pinToggleBtn.title = pinned ? '取消置顶后回到普通列表' : '置顶后会固定在列表最上方'
+    }
+
+    function renderNoteList() {
+      noteListEl.innerHTML = ''
+
+      if (!notes.length) {
+        noteListEl.innerHTML = '<li class="empty-list">还没有笔记。<br>点上方按钮新建一个。</li>'
+        showEditor(false)
+        return
+      }
+
+      notes.forEach((note, index) => {
+        const li = document.createElement('li')
+        const isActive = note.id === activeNoteId
+        const isPinned = !!note.is_pinned
+
+        li.className = 'note-row'
+          + (isActive ? ' active' : '')
+          + (isPinned ? ' pinned' : '')
+        li.dataset.id = String(note.id)
+        li.draggable = true
+        li.style.animationDelay = `${Math.min(index, 8) * 30}ms`
+
+        const handle = document.createElement('span')
+        handle.className = 'drag-handle'
+        handle.title = '拖动排序'
+        handle.textContent = '⋮⋮'
+
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.className = 'note-item'
+        btn.innerHTML = `
+          <span class="title">${escapeHtml(note.title || '无标题')}</span>
+          <span class="meta">${formatTime(note.updated_at)} · ${escapeHtml(previewText(note.content))}</span>
+        `
+        btn.addEventListener('click', () => selectNote(note.id))
+
+        const pinBtn = document.createElement('button')
+        pinBtn.type = 'button'
+        pinBtn.className = 'pin-btn' + (isPinned ? ' is-pinned' : '')
+        pinBtn.title = isPinned ? '取消置顶' : '置顶'
+        pinBtn.textContent = isPinned ? '★' : '☆'
+        pinBtn.addEventListener('click', (e) => {
+          e.stopPropagation()
+          togglePin(note.id)
+        })
+
+        li.appendChild(handle)
+        li.appendChild(btn)
+        li.appendChild(pinBtn)
+
+        li.addEventListener('dragstart', (e) => {
+          dragNoteId = note.id
+          li.classList.add('dragging')
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', String(note.id))
+        })
+
+        li.addEventListener('dragend', () => {
+          dragNoteId = null
+          li.classList.remove('dragging')
+          noteListEl.querySelectorAll('.note-row').forEach((row) => {
+            row.classList.remove('drag-over')
+          })
+        })
+
+        li.addEventListener('dragover', (e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          li.classList.add('drag-over')
+        })
+
+        li.addEventListener('dragleave', () => {
+          li.classList.remove('drag-over')
+        })
+
+        li.addEventListener('drop', async (e) => {
+          e.preventDefault()
+          li.classList.remove('drag-over')
+          const fromId = dragNoteId ?? Number(e.dataTransfer.getData('text/plain'))
+          const toId = note.id
+          if (!fromId || fromId === toId) return
+          await reorderNotes(fromId, toId)
+        })
+
+        noteListEl.appendChild(li)
+      })
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+    }
+
+    function fillEditor(note) {
+      if (!note) {
+        showEditor(false)
+        return
+      }
+      showEditor(true)
+      noteTitleEl.value = note.title || ''
+      noteEl.value = note.content || ''
+      setSaveStatus('已同步', true)
+      dirty = false
+      updatePinButton()
+    }
 
     async function loadNotes() {
-
-[1 line collapsed]
-
+      const { data, error } = await supabase
         .from('notes')
         .select('*')
         .eq('user_id', currentUser.id)
         .order('is_pinned', { ascending: false })
         .order('sort_order', { ascending: true })
         .order('updated_at', { ascending: false })
+
       if (error) {
-
-[5 lines collapsed]
-
+        console.error(error)
+        setSaveStatus('加载失败：' + error.message)
+        notes = []
+        renderNoteList()
+        return
       }
+
       notes = data || []
       sortNotesInPlace()
+
       if (!notes.length) {
         activeNoteId = null
+        renderNoteList()
+        showEditor(false)
+        return
+      }
 
-[10 lines collapsed]
+      if (!notes.some((n) => n.id === activeNoteId)) {
+        activeNoteId = notes[0].id
+      }
 
+      renderNoteList()
       fillEditor(getActiveNote())
     }
+
     async function persistOrder(changedNotes) {
       const results = await Promise.all(
         changedNotes.map((note) =>
@@ -36,6 +826,7 @@
             .eq('user_id', currentUser.id)
         )
       )
+
       const failed = results.find((r) => r.error)
       if (failed?.error) {
         console.error(failed.error)
@@ -45,35 +836,43 @@
       }
       return true
     }
+
     async function reorderNotes(fromId, toId) {
       const fromIndex = notes.findIndex((n) => n.id === fromId)
       const toIndex = notes.findIndex((n) => n.id === toId)
       if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
+
       const targetPinned = !!notes[toIndex].is_pinned
       const [moved] = notes.splice(fromIndex, 1)
       const insertAt = fromIndex < toIndex ? toIndex - 1 : toIndex
       moved.is_pinned = targetPinned
       notes.splice(insertAt, 0, moved)
+
       const pinned = notes.filter((n) => n.is_pinned)
       const unpinned = notes.filter((n) => !n.is_pinned)
       notes = [...pinned, ...unpinned]
+
       pinned.forEach((note, index) => {
         note.sort_order = index
       })
       unpinned.forEach((note, index) => {
         note.sort_order = index
       })
+
       renderNoteList()
       updatePinButton()
       await persistOrder(notes)
       setSaveStatus('顺序已更新', true)
     }
+
     window.togglePin = async function (noteId = activeNoteId) {
       const note = notes.find((n) => n.id === noteId)
       if (!note) return
+
       note.is_pinned = !note.is_pinned
       note.sort_order = nextSortOrder(note.is_pinned)
       sortNotesInPlace()
+
       // Re-number within groups for stable order
       let pinnedOrder = 0
       let unpinnedOrder = 0
@@ -84,16 +883,35 @@
           n.sort_order = unpinnedOrder++
         }
       })
+
       renderNoteList()
       updatePinButton()
       await persistOrder(notes)
       setSaveStatus(note.is_pinned ? '已置顶' : '已取消置顶', true)
     }
+
     async function selectNote(id) {
       if (id === activeNoteId) return
 
-[19 lines collapsed]
+      if (dirty) {
+        await saveNote(true)
+      }
 
+      activeNoteId = id
+      renderNoteList()
+      fillEditor(getActiveNote())
+    }
+
+    window.createNote = async function () {
+      if (!currentUser) return
+
+      if (dirty) {
+        await saveNote(true)
+      }
+
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({
           user_id: currentUser.id,
           title: '无标题',
           content: '',
@@ -102,28 +920,55 @@
           updated_at: new Date().toISOString()
         })
         .select()
-
-[2 lines collapsed]
+        .single()
 
       if (error) {
         console.error(error)
         setSaveStatus('新建失败：' + error.message)
-        alert('新建失败：' + error.message + '\n\n请确认 notes 表已有 title、user_id 字段，并开启对应 RLS 策略。')
         alert('新建失败：' + error.message + '\n\n请确认 notes 表已有 title、user_id、is_pinned、sort_order 字段。')
         return
       }
-      notes.unshift(data)
+
       notes.push(data)
       sortNotesInPlace()
       activeNoteId = data.id
       renderNoteList()
       fillEditor(data)
+      noteTitleEl.focus()
+      noteTitleEl.select()
+    }
 
-[32 lines collapsed]
+    window.saveNote = async function (silent = false) {
+      const note = getActiveNote()
+      if (!note || isSaving) return
 
+      const title = noteTitleEl.value.trim() || '无标题'
+      const content = noteEl.value
+
+      isSaving = true
+      if (!silent) setSaveStatus('保存中…')
+
+      const { data, error } = await supabase
+        .from('notes')
+        .update({
+          title,
+          content,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', note.id)
+        .eq('user_id', currentUser.id)
+        .select()
+        .single()
+
+      isSaving = false
+
+      if (error) {
+        console.error(error)
+        setSaveStatus('保存失败：' + error.message)
+        return
       }
+
       const idx = notes.findIndex((n) => n.id === note.id)
-      if (idx >= 0) notes[idx] = data
       if (idx >= 0) {
         // Keep existing pin/order; only refresh content fields from server
         notes[idx] = {
@@ -133,13 +978,88 @@
           sort_order: notes[idx].sort_order
         }
       }
-      // Keep newest first after update
-      notes.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+
       dirty = false
       setSaveStatus('已自动保存：' + new Date().toLocaleTimeString('zh-CN'), true)
       renderNoteList()
       updatePinButton()
     }
-    window.deleteNote = async function () {
 
-[77 lines collapsed]
+    window.deleteNote = async function () {
+      const note = getActiveNote()
+      if (!note) return
+
+      const ok = confirm(`确定删除「${note.title || '无标题'}」吗？此操作不可恢复。`)
+      if (!ok) return
+
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', note.id)
+        .eq('user_id', currentUser.id)
+
+      if (error) {
+        console.error(error)
+        setSaveStatus('删除失败：' + error.message)
+        return
+      }
+
+      notes = notes.filter((n) => n.id !== note.id)
+      activeNoteId = notes[0]?.id ?? null
+      dirty = false
+      renderNoteList()
+      fillEditor(getActiveNote())
+    }
+
+    window.login = async function () {
+      const email = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
+
+      messageEl.innerText = ''
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        messageEl.innerText = error.message
+        return
+      }
+
+      location.reload()
+    }
+
+    window.logout = async function () {
+      if (dirty) {
+        await saveNote(true)
+      }
+      await supabase.auth.signOut()
+      location.reload()
+    }
+
+    function scheduleAutoSave() {
+      dirty = true
+      setSaveStatus('未保存')
+      clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => {
+        saveNote(true)
+      }, 3000)
+    }
+
+    noteTitleEl.addEventListener('input', scheduleAutoSave)
+    noteEl.addEventListener('input', scheduleAutoSave)
+
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session) {
+        showLogin()
+        return
+      }
+
+      currentUser = data.session.user
+      showApp()
+      await loadNotes()
+    }
+
+    checkSession()
+  </script>
+</body>
+</html>

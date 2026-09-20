@@ -427,12 +427,75 @@
       font-size: clamp(1.6rem, 3vw, 2.1rem);
       font-weight: 700;
       letter-spacing: -0.02em;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       padding: 4px 2px;
     }
 
     #noteTitle::placeholder {
       color: rgba(22, 48, 43, 0.28);
+    }
+
+    .format-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 0 12px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 12px;
+    }
+
+    .format-btn,
+    .format-select {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--ink);
+      padding: 0 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .format-btn:hover,
+    .format-select:hover {
+      background: rgba(47, 111, 94, 0.1);
+      border-color: rgba(47, 111, 94, 0.28);
+    }
+
+    .format-btn.is-italic {
+      font-style: italic;
+    }
+
+    .format-select {
+      cursor: pointer;
+      outline: none;
+    }
+
+    .format-divider {
+      width: 1px;
+      height: 22px;
+      background: var(--line);
+      margin: 0 2px;
+    }
+
+    .color-swatches {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .color-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 0 0 1px var(--line);
+      padding: 0;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.08);
     }
 
     #note {
@@ -441,15 +504,54 @@
       min-height: 240px;
       border: none;
       outline: none;
-      resize: none;
       background: transparent;
       line-height: 1.7;
       font-size: 1.05rem;
       padding: 4px 2px;
+      overflow-y: auto;
+      word-break: break-word;
     }
 
-    #note::placeholder {
+    #note:empty::before {
+      content: attr(data-placeholder);
       color: rgba(22, 48, 43, 0.3);
+      pointer-events: none;
+    }
+
+    #note i,
+    #note em {
+      font-style: italic;
+    }
+
+    #note .todo-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 6px 0;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(47, 111, 94, 0.06);
+    }
+
+    #note .todo-item input[type="checkbox"] {
+      margin-top: 0.35em;
+      width: 1em;
+      height: 1em;
+      accent-color: var(--leaf);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    #note .todo-item .todo-text {
+      flex: 1;
+      outline: none;
+      min-width: 0;
+    }
+
+    #note .todo-item.is-done .todo-text {
+      text-decoration: line-through;
+      color: var(--ink-soft);
+      opacity: 0.85;
     }
 
     .editor-empty {
@@ -568,7 +670,45 @@
         </div>
         <div class="editor-body">
           <input id="noteTitle" type="text" placeholder="无标题" maxlength="120">
-          <textarea id="note" placeholder="开始书写…"></textarea>
+
+          <div class="format-bar">
+            <button class="format-btn is-italic" type="button" title="倾斜" onclick="formatItalic()">斜体</button>
+
+            <span class="format-divider"></span>
+
+            <label class="format-select" style="display:inline-flex;align-items:center;gap:6px;padding-right:4px;">
+              <span style="font-weight:600;font-size:0.85rem;color:var(--ink-soft);">字号</span>
+              <select id="fontSizeSelect" class="format-select" onchange="formatSize(this.value)">
+                <option value="">选择</option>
+                <option value="0.9rem">小</option>
+                <option value="1.05rem">中</option>
+                <option value="1.35rem">大</option>
+                <option value="1.7rem">特大</option>
+              </select>
+            </label>
+
+            <span class="format-divider"></span>
+
+            <div class="color-swatches" title="文字颜色">
+              <button class="color-swatch" type="button" style="background:#16302b" onclick="formatColor('#16302b')" title="默认"></button>
+              <button class="color-swatch" type="button" style="background:#2f6f5e" onclick="formatColor('#2f6f5e')" title="绿色"></button>
+              <button class="color-swatch" type="button" style="background:#9b3b2e" onclick="formatColor('#9b3b2e')" title="红色"></button>
+              <button class="color-swatch" type="button" style="background:#8a5a12" onclick="formatColor('#8a5a12')" title="棕色"></button>
+              <button class="color-swatch" type="button" style="background:#2f5f8a" onclick="formatColor('#2f5f8a')" title="蓝色"></button>
+            </div>
+
+            <span class="format-divider"></span>
+
+            <button class="format-btn" type="button" title="插入待办" onclick="insertTodo()">待办勾选</button>
+          </div>
+
+          <div
+            id="note"
+            contenteditable="true"
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder="开始书写… 可先选中文字再改斜体、颜色或字号"
+          ></div>
         </div>
       </div>
     </main>
@@ -616,9 +756,95 @@
     }
 
     function previewText(content) {
-      const text = (content || '').replace(/\s+/g, ' ').trim()
+      const tmp = document.createElement('div')
+      tmp.innerHTML = content || ''
+      const text = (tmp.textContent || '').replace(/\s+/g, ' ').trim()
       if (!text) return '空笔记'
       return text.length > 36 ? text.slice(0, 36) + '…' : text
+    }
+
+    function looksLikeHtml(content) {
+      return /<[a-z][\s\S]*>/i.test(content || '')
+    }
+
+    function setEditorContent(content) {
+      if (!content) {
+        noteEl.innerHTML = ''
+        return
+      }
+      if (looksLikeHtml(content)) {
+        noteEl.innerHTML = content
+      } else {
+        noteEl.innerHTML = escapeHtml(content).replace(/\n/g, '<br>')
+      }
+      syncTodoStyles()
+    }
+
+    function getEditorContent() {
+      const text = (noteEl.innerText || '').replace(/\u00a0/g, ' ').trim()
+      if (!text && !noteEl.querySelector('.todo-item')) return ''
+      return noteEl.innerHTML
+    }
+
+    function syncTodoStyles() {
+      noteEl.querySelectorAll('.todo-item').forEach((item) => {
+        const checkbox = item.querySelector('input[type="checkbox"]')
+        item.classList.toggle('is-done', !!(checkbox && checkbox.checked))
+      })
+    }
+
+    function restoreSelection() {
+      noteEl.focus()
+    }
+
+    window.formatItalic = function () {
+      restoreSelection()
+      document.execCommand('italic', false)
+      scheduleAutoSave()
+    }
+
+    window.formatColor = function (color) {
+      restoreSelection()
+      document.execCommand('foreColor', false, color)
+      scheduleAutoSave()
+    }
+
+    window.formatSize = function (size) {
+      if (!size) return
+      restoreSelection()
+      document.execCommand('fontSize', false, '7')
+      noteEl.querySelectorAll('font[size="7"]').forEach((fontEl) => {
+        const span = document.createElement('span')
+        span.style.fontSize = size
+        while (fontEl.firstChild) span.appendChild(fontEl.firstChild)
+        fontEl.replaceWith(span)
+      })
+      const select = document.getElementById('fontSizeSelect')
+      if (select) select.value = ''
+      scheduleAutoSave()
+    }
+
+    window.insertTodo = function () {
+      restoreSelection()
+      const html = `
+        <div class="todo-item">
+          <input type="checkbox">
+          <span class="todo-text">新待办</span>
+        </div>
+        <div><br></div>
+      `
+      document.execCommand('insertHTML', false, html)
+      const items = noteEl.querySelectorAll('.todo-item .todo-text')
+      const last = items[items.length - 1]
+      if (last) {
+        const range = document.createRange()
+        const sel = window.getSelection()
+        range.selectNodeContents(last)
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
+      syncTodoStyles()
+      scheduleAutoSave()
     }
 
     function showApp() {
@@ -772,7 +998,7 @@
       }
       showEditor(true)
       noteTitleEl.value = note.title || ''
-      noteEl.value = note.content || ''
+      setEditorContent(note.content || '')
       setSaveStatus('已同步', true)
       dirty = false
       updatePinButton()
@@ -943,7 +1169,7 @@
       if (!note || isSaving) return
 
       const title = noteTitleEl.value.trim() || '无标题'
-      const content = noteEl.value
+      const content = getEditorContent()
 
       isSaving = true
       if (!silent) setSaveStatus('保存中…')
@@ -1046,6 +1272,27 @@
 
     noteTitleEl.addEventListener('input', scheduleAutoSave)
     noteEl.addEventListener('input', scheduleAutoSave)
+
+    noteEl.addEventListener('click', (e) => {
+      if (e.target && e.target.matches('input[type="checkbox"]')) {
+        const item = e.target.closest('.todo-item')
+        if (item) item.classList.toggle('is-done', e.target.checked)
+        scheduleAutoSave()
+      }
+    })
+
+    noteEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return
+      const sel = window.getSelection()
+      if (!sel || !sel.anchorNode) return
+      const node = sel.anchorNode
+      const el = node.nodeType === 1 ? node : node.parentElement
+      const todoText = el?.closest('.todo-text')
+      if (todoText) {
+        e.preventDefault()
+        insertTodo()
+      }
+    })
 
     async function checkSession() {
       const { data } = await supabase.auth.getSession()

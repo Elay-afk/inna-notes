@@ -377,6 +377,19 @@
       color: var(--leaf-deep);
     }
 
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    #charCount {
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
     .toolbar-right {
       display: flex;
       gap: 8px;
@@ -661,7 +674,10 @@
 
       <div id="editorPanel" class="hidden" style="display: contents;">
         <div class="editor-toolbar">
-          <p id="saveStatus">未保存</p>
+          <div class="toolbar-left">
+            <p id="saveStatus">未保存</p>
+            <p id="charCount">汉字 0</p>
+          </div>
           <div class="toolbar-right">
             <button class="btn-ghost" id="pinToggleBtn" type="button" onclick="togglePin()">置顶</button>
             <button class="btn-save" type="button" onclick="saveNote()">保存</button>
@@ -735,6 +751,7 @@
     const noteTitleEl = document.getElementById('noteTitle')
     const noteEl = document.getElementById('note')
     const saveStatusEl = document.getElementById('saveStatus')
+    const charCountEl = document.getElementById('charCount')
     const editorEmptyEl = document.getElementById('editorEmpty')
     const editorPanelEl = document.getElementById('editorPanel')
     const messageEl = document.getElementById('message')
@@ -743,6 +760,16 @@
     function setSaveStatus(text, saved = false) {
       saveStatusEl.innerText = text
       saveStatusEl.classList.toggle('is-saved', saved)
+    }
+
+    function countHanzi(text) {
+      const matches = String(text || '').match(/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g)
+      return matches ? matches.length : 0
+    }
+
+    function updateCharCount() {
+      const text = noteEl.innerText || ''
+      charCountEl.textContent = `汉字 ${countHanzi(text)}`
     }
 
     function formatTime(value) {
@@ -770,6 +797,7 @@
     function setEditorContent(content) {
       if (!content) {
         noteEl.innerHTML = ''
+        updateCharCount()
         return
       }
       if (looksLikeHtml(content)) {
@@ -778,6 +806,7 @@
         noteEl.innerHTML = escapeHtml(content).replace(/\n/g, '<br>')
       }
       syncTodoStyles()
+      updateCharCount()
     }
 
     function getEditorContent() {
@@ -1263,6 +1292,7 @@
 
     function scheduleAutoSave() {
       dirty = true
+      updateCharCount()
       setSaveStatus('未保存')
       clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {

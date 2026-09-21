@@ -178,6 +178,12 @@
     #app.is-open {
       display: grid;
       grid-template-columns: 280px 1fr;
+      transition: grid-template-columns 0.24s ease, gap 0.24s ease;
+    }
+
+    #app.is-open.sidebar-collapsed {
+      grid-template-columns: 0px 1fr;
+      gap: 0;
     }
 
     .sidebar,
@@ -194,6 +200,15 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
+      min-width: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    #app.sidebar-collapsed .sidebar {
+      opacity: 0;
+      pointer-events: none;
+      border-color: transparent;
+      box-shadow: none;
     }
 
     .sidebar-top {
@@ -201,9 +216,56 @@
       border-bottom: 1px solid var(--line);
     }
 
+    .sidebar-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
     .sidebar-top .brand {
       font-size: 1.85rem;
-      margin-bottom: 14px;
+      margin-bottom: 0;
+    }
+
+    .btn-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-size: 1.15rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .btn-icon:hover {
+      background: rgba(22, 48, 43, 0.05);
+    }
+
+    .expand-sidebar {
+      display: none;
+      position: fixed;
+      left: 28px;
+      top: 30px;
+      z-index: 4;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .expand-sidebar.is-visible {
+      display: inline-flex;
+      align-items: center;
     }
 
     .sidebar-actions {
@@ -619,6 +681,12 @@
         min-height: 100vh;
       }
 
+      #app.is-open.sidebar-collapsed {
+        grid-template-columns: 1fr;
+        grid-template-rows: 0px 1fr;
+        gap: 0;
+      }
+
       .sidebar,
       .editor {
         min-height: 0;
@@ -655,7 +723,10 @@
   <div id="app" class="screen">
     <aside class="sidebar">
       <div class="sidebar-top">
-        <div class="brand">Notes</div>
+        <div class="sidebar-heading">
+          <div class="brand">Notes</div>
+          <button class="btn-icon" type="button" title="折叠列表" onclick="toggleSidebar(true)">‹</button>
+        </div>
         <div class="sidebar-actions">
           <button class="btn-new" type="button" onclick="createNote()">新建笔记</button>
           <button class="btn-ghost" type="button" onclick="logout()">退出</button>
@@ -729,6 +800,8 @@
       </div>
     </main>
   </div>
+
+  <button id="expandSidebarBtn" class="expand-sidebar" type="button" title="展开笔记列表" onclick="toggleSidebar(false)">列表 ›</button>
 
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
@@ -880,6 +953,13 @@
       loginEl.style.display = 'none'
       appEl.style.display = ''
       appEl.classList.add('is-open')
+      toggleSidebar(localStorage.getItem('notes-sidebar-collapsed') === '1')
+    }
+
+    window.toggleSidebar = function (collapsed) {
+      appEl.classList.toggle('sidebar-collapsed', collapsed)
+      document.getElementById('expandSidebarBtn').classList.toggle('is-visible', collapsed)
+      localStorage.setItem('notes-sidebar-collapsed', collapsed ? '1' : '0')
     }
 
     function showLogin() {
@@ -1027,7 +1107,7 @@
         meta.textContent = `${formatTime(note.updated_at)} · ${previewText(note.content)}`
       }
     }
-    
+
     function escapeHtml(str) {
       return String(str)
         .replaceAll('&', '&amp;')

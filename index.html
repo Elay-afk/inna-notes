@@ -1012,6 +1012,22 @@
       })
     }
 
+    function updateActiveNotePreview() {
+      const note = getActiveNote()
+      if (!note) return
+      const row = noteListEl.querySelector(`.note-row[data-id="${note.id}"]`)
+      if (!row) {
+        renderNoteList()
+        return
+      }
+      const title = row.querySelector('.title')
+      const meta = row.querySelector('.meta')
+      if (title) title.textContent = note.title || '无标题'
+      if (meta) {
+        meta.textContent = `${formatTime(note.updated_at)} · ${previewText(note.content)}`
+      }
+    }
+    
     function escapeHtml(str) {
       return String(str)
         .replaceAll('&', '&amp;')
@@ -1236,7 +1252,7 @@
 
       dirty = false
       setSaveStatus('已自动保存：' + new Date().toLocaleTimeString('zh-CN'), true)
-      renderNoteList()
+      updateActiveNotePreview()
       updatePinButton()
     }
 

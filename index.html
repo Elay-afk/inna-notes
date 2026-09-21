@@ -177,7 +177,7 @@
 
     #app.is-open {
       display: grid;
-      grid-template-columns: 280px 1fr;
+      grid-template-columns: 300px 1fr;
       transition: grid-template-columns 0.24s ease, gap 0.24s ease;
     }
 
@@ -270,7 +270,16 @@
 
     .sidebar-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
+    }
+
+    .folder-hint {
+      width: 100%;
+      margin-top: 2px;
+      font-size: 0.8rem;
+      color: var(--ink-soft);
+      line-height: 1.4;
     }
 
     .btn-new {
@@ -308,9 +317,9 @@
       list-style: none;
     }
 
-    .note-row {
+    .note-row,
+    .folder-row {
       display: grid;
-      grid-template-columns: 22px 1fr 34px;
       align-items: stretch;
       gap: 2px;
       margin-bottom: 6px;
@@ -319,28 +328,126 @@
       transition: background 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
     }
 
-    .note-row:hover {
-      background: rgba(47, 111, 94, 0.06);
+    .note-row {
+      grid-template-columns: 22px 1fr 34px;
     }
 
-    .note-row.active {
+    .folder-row {
+      grid-template-columns: 18px 18px minmax(0, 1fr) auto auto 30px;
+      background: rgba(47, 111, 94, 0.05);
+    }
+
+    .note-row.depth-1,
+    .folder-row.depth-1 {
+      margin-left: 16px;
+    }
+
+    .note-row.depth-2 {
+      margin-left: 32px;
+    }
+
+    .note-row:hover,
+    .folder-row:hover {
+      background: rgba(47, 111, 94, 0.08);
+    }
+
+    .note-row.active,
+    .folder-row.selected {
       background: rgba(47, 111, 94, 0.14);
     }
 
-    .note-row.dragging {
+    .note-row.dragging,
+    .folder-row.dragging {
       opacity: 0.45;
     }
 
-    .note-row.drag-over {
+    .note-row.drag-over,
+    .folder-row.drag-over,
+    .root-drop.drag-over {
       box-shadow: inset 0 2px 0 var(--leaf);
     }
 
-    .note-row.pinned .note-item .title::before {
+    .note-row.pinned .note-item .title::before,
+    .folder-row.pinned .folder-name::before {
       content: "置顶 · ";
       color: var(--leaf-deep);
       font-weight: 600;
       font-size: 0.78rem;
       letter-spacing: 0.02em;
+    }
+
+    .chevron,
+    .mini-btn {
+      display: grid;
+      place-items: center;
+      background: transparent;
+      color: var(--ink-soft);
+      border-radius: 8px;
+    }
+
+    .chevron {
+      width: 18px;
+      font-size: 0.72rem;
+    }
+
+    .mini-btn {
+      width: 22px;
+      height: 22px;
+      align-self: center;
+      font-size: 0.95rem;
+      line-height: 1;
+    }
+
+    .mini-btn:hover,
+    .chevron:hover {
+      background: rgba(47, 111, 94, 0.12);
+      color: var(--leaf-deep);
+    }
+
+    .folder-delete {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .folder-row:hover .folder-delete,
+    .folder-row:focus-within .folder-delete {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .folder-name {
+      width: 100%;
+      text-align: left;
+      padding: 9px 4px;
+      background: transparent;
+      font-weight: 700;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .group-label,
+    .root-drop-hint {
+      margin: 8px 4px;
+      padding: 7px 8px;
+      border-radius: 10px;
+      color: var(--ink-soft);
+      font-size: 0.8rem;
+    }
+
+    .group-label {
+      letter-spacing: 0.04em;
+    }
+
+    .root-drop-hint {
+      display: none;
+      border: 1px dashed rgba(47, 111, 94, 0.45);
+      text-align: center;
+    }
+
+    .note-list.is-dragging .root-drop-hint {
+      display: block;
     }
 
     .drag-handle {
@@ -729,7 +836,9 @@
         </div>
         <div class="sidebar-actions">
           <button class="btn-new" type="button" onclick="createNote()">新建笔记</button>
+          <button class="btn-ghost" type="button" onclick="createFolder()">新建标签</button>
           <button class="btn-ghost" type="button" onclick="logout()">退出</button>
+          <p id="folderHint" class="folder-hint">新建笔记将放到：未归类</p>
         </div>
       </div>
       <ul id="noteList" class="note-list"></ul>
@@ -739,7 +848,7 @@
       <div id="editorEmpty" class="editor-empty">
         <div>
           <strong>还没有笔记</strong>
-          点击左侧「新建笔记」，开始写下第一段文字。
+          先在左侧选中一个标签，再点「新建笔记」。标签可以展开、收起、置顶和拖动。
         </div>
       </div>
 
@@ -812,11 +921,14 @@
 
     let currentUser = null
     let notes = []
+    let folders = []
     let activeNoteId = null
+    let activeFolderId = null
     let saveTimer = null
     let isSaving = false
     let dirty = false
-    let dragNoteId = null
+    let dragItem = null
+    let closedFolderIds = loadClosedFolders()
 
     const loginEl = document.getElementById('login')
     const appEl = document.getElementById('app')
@@ -829,6 +941,15 @@
     const editorPanelEl = document.getElementById('editorPanel')
     const messageEl = document.getElementById('message')
     const pinToggleBtn = document.getElementById('pinToggleBtn')
+    const folderHintEl = document.getElementById('folderHint')
+
+    function loadClosedFolders() {
+      try {
+        return new Set(JSON.parse(localStorage.getItem('notes-closed-folders') || '[]').map(String))
+      } catch {
+        return new Set()
+      }
+    }
 
     function setSaveStatus(text, saved = false) {
       saveStatusEl.innerText = text
@@ -977,24 +1098,87 @@
     }
 
     function getActiveNote() {
-      return notes.find((n) => n.id === activeNoteId) || null
+      return notes.find((n) => sameId(n.id, activeNoteId)) || null
     }
 
-    function sortNotesInPlace() {
-      notes.sort((a, b) => {
-        const pinDiff = Number(!!b.is_pinned) - Number(!!a.is_pinned)
-        if (pinDiff !== 0) return pinDiff
-        const orderA = a.sort_order ?? 0
-        const orderB = b.sort_order ?? 0
-        if (orderA !== orderB) return orderA - orderB
-        return new Date(b.updated_at) - new Date(a.updated_at)
+    function normId(id) {
+      return id == null || id === '' ? null : String(id)
+    }
+
+    function sameId(a, b) {
+      return normId(a) !== null && normId(a) === normId(b)
+    }
+
+    function findNote(id) {
+      return notes.find((note) => sameId(note.id, id)) || null
+    }
+
+    function findFolder(id) {
+      return folders.find((folder) => sameId(folder.id, id)) || null
+    }
+
+    function compareItem(a, b) {
+      const pinDiff = Number(!!b.is_pinned) - Number(!!a.is_pinned)
+      if (pinDiff !== 0) return pinDiff
+      const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      if (orderDiff !== 0) return orderDiff
+      return new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
+    }
+
+    function sortItems(list) {
+      return [...list].sort(compareItem)
+    }
+
+    function nextOrder(list, key, parentVal, pinned) {
+      const group = list.filter((item) => normId(item[key]) === normId(parentVal) && !!item.is_pinned === !!pinned)
+      if (!group.length) return 0
+      return Math.min(...group.map((item) => item.sort_order ?? 0)) - 1
+    }
+
+    function renumberGroup(list, key, parentVal) {
+      const group = list.filter((item) => normId(item[key]) === normId(parentVal))
+      sortItems(group.filter((item) => item.is_pinned)).forEach((item, index) => {
+        item.sort_order = index
+      })
+      sortItems(group.filter((item) => !item.is_pinned)).forEach((item, index) => {
+        item.sort_order = index
       })
     }
 
-    function nextSortOrder(pinned) {
-      const group = notes.filter((n) => !!n.is_pinned === !!pinned)
-      if (!group.length) return 0
-      return Math.min(...group.map((n) => n.sort_order ?? 0)) - 1
+    function folderHasChildren(folderId) {
+      return folders.some((folder) => sameId(folder.parent_id, folderId))
+    }
+
+    function isFolderOpen(id) {
+      return !closedFolderIds.has(String(id))
+    }
+
+    function setFolderOpen(id, open) {
+      if (id == null) return
+      const key = String(id)
+      if (open) closedFolderIds.delete(key)
+      else closedFolderIds.add(key)
+      localStorage.setItem('notes-closed-folders', JSON.stringify([...closedFolderIds]))
+    }
+
+    function revealFolder(folderId) {
+      const folder = findFolder(folderId)
+      if (!folder) return
+      setFolderOpen(folder.id, true)
+      if (folder.parent_id) setFolderOpen(folder.parent_id, true)
+    }
+
+    function folderPath(folderId) {
+      const folder = findFolder(folderId)
+      if (!folder) return '未归类'
+      if (!folder.parent_id) return folder.name || '未命名标签'
+      const parent = findFolder(folder.parent_id)
+      return `${parent ? parent.name : '标签'} / ${folder.name || '未命名标签'}`
+    }
+
+    function updateFolderHint() {
+      if (!folderHintEl) return
+      folderHintEl.textContent = `新建笔记将放到：${folderPath(activeFolderId)}`
     }
 
     function updatePinButton() {
@@ -1002,94 +1186,201 @@
       if (!note) return
       const pinned = !!note.is_pinned
       pinToggleBtn.textContent = pinned ? '取消置顶' : '置顶'
-      pinToggleBtn.title = pinned ? '取消置顶后回到普通列表' : '置顶后会固定在列表最上方'
+      pinToggleBtn.title = pinned ? '取消在当前标签内的置顶' : '在当前标签内置顶'
+    }
+
+    function bindDragSource(handle, item, row) {
+      handle.draggable = true
+      handle.addEventListener('dragstart', (e) => {
+        dragItem = item
+        row.classList.add('dragging')
+        noteListEl.classList.add('is-dragging')
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', JSON.stringify(item))
+        e.stopPropagation()
+      })
+      handle.addEventListener('dragend', () => {
+        dragItem = null
+        row.classList.remove('dragging')
+        noteListEl.classList.remove('is-dragging')
+        noteListEl.querySelectorAll('.drag-over').forEach((node) => node.classList.remove('drag-over'))
+      })
+    }
+
+    function bindDropTarget(el, onDrop) {
+      el.addEventListener('dragover', (e) => {
+        if (!dragItem) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'move'
+        el.classList.add('drag-over')
+      })
+      el.addEventListener('dragleave', () => {
+        el.classList.remove('drag-over')
+      })
+      el.addEventListener('drop', async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        el.classList.remove('drag-over')
+        const item = dragItem
+        if (!item) return
+        await onDrop(item)
+      })
     }
 
     function renderNoteList() {
       noteListEl.innerHTML = ''
+      updateFolderHint()
 
-      if (!notes.length) {
-        noteListEl.innerHTML = '<li class="empty-list">还没有笔记。<br>点上方按钮新建一个。</li>'
+      if (!notes.length && !folders.length) {
+        noteListEl.innerHTML = '<li class="empty-list">还没有内容。<br>可以先新建标签，再在标签里新建笔记。</li>'
         showEditor(false)
         return
       }
 
-      notes.forEach((note, index) => {
-        const li = document.createElement('li')
-        const isActive = note.id === activeNoteId
-        const isPinned = !!note.is_pinned
-
-        li.className = 'note-row'
-          + (isActive ? ' active' : '')
-          + (isPinned ? ' pinned' : '')
-        li.dataset.id = String(note.id)
-        li.draggable = true
-        li.style.animationDelay = `${Math.min(index, 8) * 30}ms`
-
-        const handle = document.createElement('span')
-        handle.className = 'drag-handle'
-        handle.title = '拖动排序'
-        handle.textContent = '⋮⋮'
-
-        const btn = document.createElement('button')
-        btn.type = 'button'
-        btn.className = 'note-item'
-        btn.innerHTML = `
-          <span class="title">${escapeHtml(note.title || '无标题')}</span>
-          <span class="meta">${formatTime(note.updated_at)} · ${escapeHtml(previewText(note.content))}</span>
-        `
-        btn.addEventListener('click', () => selectNote(note.id))
-
-        const pinBtn = document.createElement('button')
-        pinBtn.type = 'button'
-        pinBtn.className = 'pin-btn' + (isPinned ? ' is-pinned' : '')
-        pinBtn.title = isPinned ? '取消置顶' : '置顶'
-        pinBtn.textContent = isPinned ? '★' : '☆'
-        pinBtn.addEventListener('click', (e) => {
-          e.stopPropagation()
-          togglePin(note.id)
-        })
-
-        li.appendChild(handle)
-        li.appendChild(btn)
-        li.appendChild(pinBtn)
-
-        li.addEventListener('dragstart', (e) => {
-          dragNoteId = note.id
-          li.classList.add('dragging')
-          e.dataTransfer.effectAllowed = 'move'
-          e.dataTransfer.setData('text/plain', String(note.id))
-        })
-
-        li.addEventListener('dragend', () => {
-          dragNoteId = null
-          li.classList.remove('dragging')
-          noteListEl.querySelectorAll('.note-row').forEach((row) => {
-            row.classList.remove('drag-over')
-          })
-        })
-
-        li.addEventListener('dragover', (e) => {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          li.classList.add('drag-over')
-        })
-
-        li.addEventListener('dragleave', () => {
-          li.classList.remove('drag-over')
-        })
-
-        li.addEventListener('drop', async (e) => {
-          e.preventDefault()
-          li.classList.remove('drag-over')
-          const fromId = dragNoteId ?? Number(e.dataTransfer.getData('text/plain'))
-          const toId = note.id
-          if (!fromId || fromId === toId) return
-          await reorderNotes(fromId, toId)
-        })
-
-        noteListEl.appendChild(li)
+      sortItems(folders.filter((folder) => !folder.parent_id)).forEach((folder, index) => {
+        renderFolderBranch(folder, 0, index)
       })
+
+      const looseNotes = sortItems(notes.filter((note) => !note.folder_id))
+      if (looseNotes.length && folders.length) {
+        const label = document.createElement('li')
+        label.className = 'group-label root-drop'
+        label.textContent = '未归类'
+        bindDropTarget(label, (item) => moveItemToRoot(item))
+        noteListEl.appendChild(label)
+      }
+      looseNotes.forEach((note, index) => renderNoteRow(note, folders.length ? 1 : 0, index))
+
+      const hint = document.createElement('li')
+      hint.className = 'root-drop-hint root-drop'
+      hint.textContent = '拖到这里，放到最外层'
+      bindDropTarget(hint, (item) => moveItemToRoot(item))
+      noteListEl.appendChild(hint)
+    }
+
+    function renderFolderBranch(folder, depth, index) {
+      const li = document.createElement('li')
+      const isPinned = !!folder.is_pinned
+      const isChild = depth > 0
+      li.className = `folder-row depth-${depth}`
+        + (sameId(folder.id, activeFolderId) ? ' selected' : '')
+        + (isPinned ? ' pinned' : '')
+      li.dataset.id = String(folder.id)
+      li.style.animationDelay = `${Math.min(index, 8) * 30}ms`
+
+      const handle = document.createElement('span')
+      handle.className = 'drag-handle'
+      handle.title = '拖动标签'
+      handle.textContent = '⋮⋮'
+
+      const chevron = document.createElement('button')
+      chevron.type = 'button'
+      chevron.className = 'chevron'
+      chevron.title = isFolderOpen(folder.id) ? '收起' : '展开'
+      chevron.textContent = isFolderOpen(folder.id) ? '▼' : '▶'
+      chevron.addEventListener('click', (e) => {
+        e.stopPropagation()
+        setFolderOpen(folder.id, !isFolderOpen(folder.id))
+        renderNoteList()
+      })
+
+      const nameBtn = document.createElement('button')
+      nameBtn.type = 'button'
+      nameBtn.className = 'folder-name'
+      nameBtn.textContent = folder.name || '未命名标签'
+      nameBtn.title = '单击选中，双击改名'
+      nameBtn.addEventListener('click', () => selectFolder(folder.id))
+      nameBtn.addEventListener('dblclick', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        renameFolder(folder.id)
+      })
+
+      const addChild = document.createElement('button')
+      addChild.type = 'button'
+      addChild.className = 'mini-btn'
+      addChild.title = isChild ? '' : '新建小标签'
+      addChild.textContent = isChild ? '' : '+'
+      addChild.disabled = isChild
+      addChild.style.visibility = isChild ? 'hidden' : 'visible'
+      addChild.addEventListener('click', (e) => {
+        e.stopPropagation()
+        createFolder(folder.id)
+      })
+
+      const removeBtn = document.createElement('button')
+      removeBtn.type = 'button'
+      removeBtn.className = 'mini-btn folder-delete'
+      removeBtn.title = '删除标签'
+      removeBtn.textContent = '×'
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        deleteFolder(folder.id)
+      })
+
+      const pinBtn = document.createElement('button')
+      pinBtn.type = 'button'
+      pinBtn.className = 'pin-btn' + (isPinned ? ' is-pinned' : '')
+      pinBtn.title = isPinned ? '取消置顶' : '置顶标签'
+      pinBtn.textContent = isPinned ? '★' : '☆'
+      pinBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        toggleFolderPin(folder.id)
+      })
+
+      li.append(handle, chevron, nameBtn, addChild, removeBtn, pinBtn)
+      bindDragSource(handle, { type: 'folder', id: folder.id }, li)
+      bindDropTarget(li, (item) => dropOnFolder(item, folder.id))
+      noteListEl.appendChild(li)
+
+      if (!isFolderOpen(folder.id)) return
+
+      sortItems(folders.filter((child) => sameId(child.parent_id, folder.id))).forEach((child, childIndex) => {
+        renderFolderBranch(child, depth + 1, childIndex)
+      })
+      sortItems(notes.filter((note) => sameId(note.folder_id, folder.id))).forEach((note, noteIndex) => {
+        renderNoteRow(note, depth + 1, noteIndex)
+      })
+    }
+
+    function renderNoteRow(note, depth, index) {
+      const li = document.createElement('li')
+      const isPinned = !!note.is_pinned
+      li.className = `note-row depth-${depth}`
+        + (sameId(note.id, activeNoteId) ? ' active' : '')
+        + (isPinned ? ' pinned' : '')
+      li.dataset.id = String(note.id)
+      li.style.animationDelay = `${Math.min(index, 8) * 30}ms`
+
+      const handle = document.createElement('span')
+      handle.className = 'drag-handle'
+      handle.title = '拖动笔记'
+      handle.textContent = '⋮⋮'
+
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'note-item'
+      btn.innerHTML = `
+        <span class="title">${escapeHtml(note.title || '无标题')}</span>
+        <span class="meta">${formatTime(note.updated_at)} · ${escapeHtml(previewText(note.content))}</span>
+      `
+      btn.addEventListener('click', () => selectNote(note.id))
+
+      const pinBtn = document.createElement('button')
+      pinBtn.type = 'button'
+      pinBtn.className = 'pin-btn' + (isPinned ? ' is-pinned' : '')
+      pinBtn.title = isPinned ? '取消置顶' : '置顶'
+      pinBtn.textContent = isPinned ? '★' : '☆'
+      pinBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        togglePin(note.id)
+      })
+
+      li.append(handle, btn, pinBtn)
+      bindDragSource(handle, { type: 'note', id: note.id }, li)
+      bindDropTarget(li, (item) => dropOnNote(item, note.id))
+      noteListEl.appendChild(li)
     }
 
     function updateActiveNotePreview() {
@@ -1103,9 +1394,321 @@
       const title = row.querySelector('.title')
       const meta = row.querySelector('.meta')
       if (title) title.textContent = note.title || '无标题'
-      if (meta) {
-        meta.textContent = `${formatTime(note.updated_at)} · ${previewText(note.content)}`
+      if (meta) meta.textContent = `${formatTime(note.updated_at)} · ${previewText(note.content)}`
+    }
+
+    async function persistNotes(list = notes) {
+      if (!list.length) return true
+      const saveFolder = folders.length > 0 || notes.some((note) => note.folder_id)
+      const results = await Promise.all(list.map((note) => {
+        const payload = {
+          is_pinned: !!note.is_pinned,
+          sort_order: note.sort_order ?? 0
+        }
+        if (saveFolder) payload.folder_id = note.folder_id ?? null
+        return supabase
+          .from('notes')
+          .update(payload)
+          .eq('id', note.id)
+          .eq('user_id', currentUser.id)
+      }))
+      const failed = results.find((result) => result.error)
+      if (failed?.error) {
+        console.error(failed.error)
+        setSaveStatus('笔记位置保存失败：' + failed.error.message)
+        alert('笔记位置保存失败：' + failed.error.message + '\n\n请确认 notes 表已有 folder_id 字段。')
+        return false
       }
+      return true
+    }
+
+    async function persistFolders(list = folders) {
+      if (!list.length) return true
+      const results = await Promise.all(list.map((folder) =>
+        supabase
+          .from('folders')
+          .update({
+            parent_id: folder.parent_id ?? null,
+            is_pinned: !!folder.is_pinned,
+            sort_order: folder.sort_order ?? 0,
+            name: folder.name
+          })
+          .eq('id', folder.id)
+          .eq('user_id', currentUser.id)
+      ))
+      const failed = results.find((result) => result.error)
+      if (failed?.error) {
+        console.error(failed.error)
+        setSaveStatus('标签保存失败：' + failed.error.message)
+        alert('标签保存失败：' + failed.error.message + '\n\n请先在 Supabase 创建 folders 表。')
+        return false
+      }
+      return true
+    }
+
+    async function dropOnNote(item, targetNoteId) {
+      if (item.type !== 'note' || sameId(item.id, targetNoteId)) return
+      const note = findNote(item.id)
+      const target = findNote(targetNoteId)
+      if (!note || !target) return
+
+      const oldFolder = note.folder_id ?? null
+      note.folder_id = target.folder_id ?? null
+      note.is_pinned = !!target.is_pinned
+      note.sort_order = (target.sort_order ?? 0) - 0.5
+      renumberGroup(notes, 'folder_id', oldFolder)
+      renumberGroup(notes, 'folder_id', note.folder_id)
+      activeFolderId = note.folder_id ?? null
+      revealFolder(note.folder_id)
+      renderNoteList()
+      await persistNotes(notes)
+      setSaveStatus('笔记已移动', true)
+    }
+
+    async function dropOnFolder(item, targetFolderId) {
+      if (item.type === 'note') {
+        const note = findNote(item.id)
+        if (!note || sameId(note.folder_id, targetFolderId)) return
+        const oldFolder = note.folder_id ?? null
+        note.folder_id = targetFolderId
+        note.is_pinned = false
+        note.sort_order = nextOrder(notes, 'folder_id', targetFolderId, false)
+        renumberGroup(notes, 'folder_id', oldFolder)
+        renumberGroup(notes, 'folder_id', targetFolderId)
+        activeFolderId = targetFolderId
+        revealFolder(targetFolderId)
+        renderNoteList()
+        await persistNotes(notes)
+        setSaveStatus('笔记已移动', true)
+        return
+      }
+
+      if (item.type === 'folder') {
+        await dropFolderOnFolder(item.id, targetFolderId)
+      }
+    }
+
+    async function dropFolderOnFolder(fromId, toId) {
+      const source = findFolder(fromId)
+      const target = findFolder(toId)
+      if (!source || !target || sameId(source.id, target.id)) return
+      if (sameId(source.id, target.parent_id)) return
+
+      const oldParent = source.parent_id ?? null
+      const sourceIsRoot = !source.parent_id
+      const targetIsRoot = !target.parent_id
+
+      if (normId(source.parent_id) === normId(target.parent_id)) {
+        source.is_pinned = !!target.is_pinned
+        source.sort_order = (target.sort_order ?? 0) - 0.5
+        renumberGroup(folders, 'parent_id', oldParent)
+      } else if (!sourceIsRoot && targetIsRoot) {
+        source.parent_id = target.id
+        source.is_pinned = false
+        source.sort_order = nextOrder(folders, 'parent_id', target.id, false)
+        renumberGroup(folders, 'parent_id', oldParent)
+        renumberGroup(folders, 'parent_id', target.id)
+        setFolderOpen(target.id, true)
+      } else if (!sourceIsRoot && !targetIsRoot) {
+        source.parent_id = target.parent_id
+        source.is_pinned = !!target.is_pinned
+        source.sort_order = (target.sort_order ?? 0) - 0.5
+        renumberGroup(folders, 'parent_id', oldParent)
+        renumberGroup(folders, 'parent_id', target.parent_id)
+        setFolderOpen(target.parent_id, true)
+      } else if (sourceIsRoot && !targetIsRoot && !folderHasChildren(source.id)) {
+        source.parent_id = target.parent_id
+        source.is_pinned = !!target.is_pinned
+        source.sort_order = (target.sort_order ?? 0) - 0.5
+        renumberGroup(folders, 'parent_id', null)
+        renumberGroup(folders, 'parent_id', target.parent_id)
+        setFolderOpen(target.parent_id, true)
+      } else {
+        setSaveStatus('大标签下面如果还有小标签，就不能再拖进别的标签')
+        return
+      }
+
+      renderNoteList()
+      await persistFolders(folders)
+      setSaveStatus('标签顺序已更新', true)
+    }
+
+    async function moveItemToRoot(item) {
+      if (item.type === 'note') {
+        const note = findNote(item.id)
+        if (!note || !note.folder_id) return
+        const oldFolder = note.folder_id
+        note.folder_id = null
+        note.is_pinned = false
+        note.sort_order = nextOrder(notes, 'folder_id', null, false)
+        renumberGroup(notes, 'folder_id', oldFolder)
+        renumberGroup(notes, 'folder_id', null)
+        activeFolderId = null
+        renderNoteList()
+        await persistNotes(notes)
+        setSaveStatus('笔记已移到最外层', true)
+        return
+      }
+
+      const folder = findFolder(item.id)
+      if (!folder || !folder.parent_id) return
+      if (folderHasChildren(folder.id)) return
+      const oldParent = folder.parent_id
+      folder.parent_id = null
+      folder.is_pinned = false
+      folder.sort_order = nextOrder(folders, 'parent_id', null, false)
+      renumberGroup(folders, 'parent_id', oldParent)
+      renumberGroup(folders, 'parent_id', null)
+      renderNoteList()
+      await persistFolders(folders)
+      setSaveStatus('标签已移到最外层', true)
+    }
+
+    function selectFolder(id) {
+      const wasOpen = isFolderOpen(id)
+      activeFolderId = id
+      setFolderOpen(id, true)
+      if (!wasOpen) {
+        renderNoteList()
+        return
+      }
+      noteListEl.querySelectorAll('.folder-row').forEach((row) => {
+        row.classList.toggle('selected', row.dataset.id === String(id))
+      })
+      updateFolderHint()
+    }
+
+    window.createFolder = async function (parentId = null) {
+      if (!currentUser) return
+      if (parentId && typeof parentId === 'object') parentId = null
+
+      if (parentId) {
+        const parent = findFolder(parentId)
+        if (!parent || parent.parent_id) {
+          setSaveStatus('只能在大标签下新建小标签')
+          return
+        }
+      }
+
+      const name = prompt(parentId ? '小标签名称' : '大标签名称', parentId ? '新小标签' : '新标签')
+      if (!name || !name.trim()) return
+
+      const { data, error } = await supabase
+        .from('folders')
+        .insert({
+          user_id: currentUser.id,
+          name: name.trim(),
+          parent_id: parentId,
+          is_pinned: false,
+          sort_order: nextOrder(folders, 'parent_id', parentId, false),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error(error)
+        setSaveStatus('新建标签失败：' + error.message)
+        alert('新建标签失败：' + error.message + '\n\n请先在 Supabase 创建 folders 表，并给 notes 表加上 folder_id 字段。')
+        return
+      }
+
+      folders.push(data)
+      activeFolderId = data.id
+      if (parentId) setFolderOpen(parentId, true)
+      setFolderOpen(data.id, true)
+      renderNoteList()
+      setSaveStatus('标签已创建', true)
+    }
+
+    async function renameFolder(folderId) {
+      const folder = findFolder(folderId)
+      if (!folder) return
+      const name = prompt('标签名称', folder.name || '')
+      if (!name || !name.trim() || name.trim() === folder.name) return
+
+      const { error } = await supabase
+        .from('folders')
+        .update({
+          name: name.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', folder.id)
+        .eq('user_id', currentUser.id)
+
+      if (error) {
+        console.error(error)
+        setSaveStatus('重命名失败：' + error.message)
+        return
+      }
+
+      folder.name = name.trim()
+      renderNoteList()
+    }
+
+    async function deleteFolder(folderId) {
+      const folder = findFolder(folderId)
+      if (!folder) return
+      const ok = confirm(`删除标签「${folder.name || '未命名标签'}」？\n里面的笔记和子标签会移到上一级，不会被删除。`)
+      if (!ok) return
+
+      const parent = folder.parent_id ?? null
+      folders.forEach((item) => {
+        if (sameId(item.parent_id, folder.id)) item.parent_id = parent
+      })
+      notes.forEach((note) => {
+        if (sameId(note.folder_id, folder.id)) note.folder_id = parent
+      })
+      folders = folders.filter((item) => !sameId(item.id, folder.id))
+      if (sameId(activeFolderId, folder.id)) activeFolderId = parent
+      renumberGroup(folders, 'parent_id', parent)
+      renumberGroup(notes, 'folder_id', parent)
+
+      const savedFolders = await persistFolders(folders)
+      const savedNotes = await persistNotes(notes)
+      if (!savedFolders || !savedNotes) {
+        await loadNotes()
+        return
+      }
+
+      const { error } = await supabase
+        .from('folders')
+        .delete()
+        .eq('id', folder.id)
+        .eq('user_id', currentUser.id)
+
+      if (error) {
+        console.error(error)
+        setSaveStatus('删除标签失败：' + error.message)
+        await loadNotes()
+        return
+      }
+
+      renderNoteList()
+      setSaveStatus('标签已删除', true)
+    }
+
+    window.toggleFolderPin = async function (folderId) {
+      const folder = findFolder(folderId)
+      if (!folder) return
+      folder.is_pinned = !folder.is_pinned
+      folder.sort_order = nextOrder(folders, 'parent_id', folder.parent_id ?? null, folder.is_pinned)
+      renumberGroup(folders, 'parent_id', folder.parent_id ?? null)
+      renderNoteList()
+      await persistFolders(folders.filter((item) => normId(item.parent_id) === normId(folder.parent_id)))
+      setSaveStatus(folder.is_pinned ? '标签已置顶' : '已取消标签置顶', true)
+    }
+
+    window.togglePin = async function (noteId = activeNoteId) {
+      const note = findNote(noteId)
+      if (!note) return
+      note.is_pinned = !note.is_pinned
+      note.sort_order = nextOrder(notes, 'folder_id', note.folder_id ?? null, note.is_pinned)
+      renumberGroup(notes, 'folder_id', note.folder_id ?? null)
+      renderNoteList()
+      updatePinButton()
+      await persistNotes(notes.filter((item) => normId(item.folder_id) === normId(note.folder_id)))
+      setSaveStatus(note.is_pinned ? '已置顶' : '已取消置顶', true)
     }
 
     function escapeHtml(str) {
@@ -1130,24 +1733,33 @@
     }
 
     async function loadNotes() {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('is_pinned', { ascending: false })
-        .order('sort_order', { ascending: true })
-        .order('updated_at', { ascending: false })
+      const [notesRes, foldersRes] = await Promise.all([
+        supabase
+          .from('notes')
+          .select('*')
+          .eq('user_id', currentUser.id),
+        supabase
+          .from('folders')
+          .select('*')
+          .eq('user_id', currentUser.id)
+      ])
 
-      if (error) {
-        console.error(error)
-        setSaveStatus('加载失败：' + error.message)
+      if (notesRes.error) {
+        console.error(notesRes.error)
+        setSaveStatus('加载失败：' + notesRes.error.message)
         notes = []
+        folders = []
         renderNoteList()
         return
       }
 
-      notes = data || []
-      sortNotesInPlace()
+      notes = notesRes.data || []
+      if (foldersRes.error) {
+        console.error(foldersRes.error)
+        folders = []
+      } else {
+        folders = foldersRes.data || []
+      }
 
       if (!notes.length) {
         activeNoteId = null
@@ -1156,99 +1768,25 @@
         return
       }
 
-      if (!notes.some((n) => n.id === activeNoteId)) {
+      if (!notes.some((n) => sameId(n.id, activeNoteId))) {
         activeNoteId = notes[0].id
       }
+      const active = getActiveNote()
+      activeFolderId = active?.folder_id ?? null
 
       renderNoteList()
-      fillEditor(getActiveNote())
-    }
-
-    async function persistOrder(changedNotes) {
-      const results = await Promise.all(
-        changedNotes.map((note) =>
-          supabase
-            .from('notes')
-            .update({
-              is_pinned: !!note.is_pinned,
-              sort_order: note.sort_order ?? 0
-            })
-            .eq('id', note.id)
-            .eq('user_id', currentUser.id)
-        )
-      )
-
-      const failed = results.find((r) => r.error)
-      if (failed?.error) {
-        console.error(failed.error)
-        setSaveStatus('排序保存失败：' + failed.error.message)
-        alert('排序/置顶保存失败：' + failed.error.message + '\n\n请先在 Supabase 为 notes 表添加 is_pinned、sort_order 字段。')
-        return false
-      }
-      return true
-    }
-
-    async function reorderNotes(fromId, toId) {
-      const fromIndex = notes.findIndex((n) => n.id === fromId)
-      const toIndex = notes.findIndex((n) => n.id === toId)
-      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
-
-      const targetPinned = !!notes[toIndex].is_pinned
-      const [moved] = notes.splice(fromIndex, 1)
-      const insertAt = fromIndex < toIndex ? toIndex - 1 : toIndex
-      moved.is_pinned = targetPinned
-      notes.splice(insertAt, 0, moved)
-
-      const pinned = notes.filter((n) => n.is_pinned)
-      const unpinned = notes.filter((n) => !n.is_pinned)
-      notes = [...pinned, ...unpinned]
-
-      pinned.forEach((note, index) => {
-        note.sort_order = index
-      })
-      unpinned.forEach((note, index) => {
-        note.sort_order = index
-      })
-
-      renderNoteList()
-      updatePinButton()
-      await persistOrder(notes)
-      setSaveStatus('顺序已更新', true)
-    }
-
-    window.togglePin = async function (noteId = activeNoteId) {
-      const note = notes.find((n) => n.id === noteId)
-      if (!note) return
-
-      note.is_pinned = !note.is_pinned
-      note.sort_order = nextSortOrder(note.is_pinned)
-      sortNotesInPlace()
-
-      // Re-number within groups for stable order
-      let pinnedOrder = 0
-      let unpinnedOrder = 0
-      notes.forEach((n) => {
-        if (n.is_pinned) {
-          n.sort_order = pinnedOrder++
-        } else {
-          n.sort_order = unpinnedOrder++
-        }
-      })
-
-      renderNoteList()
-      updatePinButton()
-      await persistOrder(notes)
-      setSaveStatus(note.is_pinned ? '已置顶' : '已取消置顶', true)
+      fillEditor(active)
     }
 
     async function selectNote(id) {
-      if (id === activeNoteId) return
+      if (sameId(id, activeNoteId)) return
 
       if (dirty) {
         await saveNote(true)
       }
 
       activeNoteId = id
+      activeFolderId = findNote(id)?.folder_id ?? null
       renderNoteList()
       fillEditor(getActiveNote())
     }
@@ -1260,29 +1798,34 @@
         await saveNote(true)
       }
 
+      const folderId = activeFolderId ?? null
+      const payload = {
+        user_id: currentUser.id,
+        title: '无标题',
+        content: '',
+        is_pinned: false,
+        sort_order: nextOrder(notes, 'folder_id', folderId, false),
+        updated_at: new Date().toISOString()
+      }
+      if (folderId) payload.folder_id = folderId
+
       const { data, error } = await supabase
         .from('notes')
-        .insert({
-          user_id: currentUser.id,
-          title: '无标题',
-          content: '',
-          is_pinned: false,
-          sort_order: nextSortOrder(false),
-          updated_at: new Date().toISOString()
-        })
+        .insert(payload)
         .select()
         .single()
 
       if (error) {
         console.error(error)
         setSaveStatus('新建失败：' + error.message)
-        alert('新建失败：' + error.message + '\n\n请确认 notes 表已有 title、user_id、is_pinned、sort_order 字段。')
+        alert('新建失败：' + error.message + '\n\n请确认 notes 表已有 folder_id、title、user_id、is_pinned、sort_order 字段。')
         return
       }
 
       notes.push(data)
-      sortNotesInPlace()
+      renumberGroup(notes, 'folder_id', folderId)
       activeNoteId = data.id
+      revealFolder(folderId)
       renderNoteList()
       fillEditor(data)
       noteTitleEl.focus()
@@ -1326,7 +1869,8 @@
           ...notes[idx],
           ...data,
           is_pinned: notes[idx].is_pinned,
-          sort_order: notes[idx].sort_order
+          sort_order: notes[idx].sort_order,
+          folder_id: notes[idx].folder_id
         }
       }
 
